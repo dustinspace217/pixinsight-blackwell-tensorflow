@@ -1,0 +1,29 @@
+--- external/boringssl/src/crypto/internal.h.orig	2026-06-07 02:08:05.205399743 -0700
++++ external/boringssl/src/crypto/internal.h	2026-06-07 02:08:05.206652720 -0700
+@@ -835,7 +835,7 @@
+     return NULL;
+   }
+ 
+-  return memchr(s, c, n);
++  return (void *)memchr(s, c, n);
+ }
+ 
+ static inline void *OPENSSL_memchr(void *s, int c, size_t n) {
+@@ -843,7 +843,7 @@
+     return NULL;
+   }
+ 
+-  return memchr(s, c, n);
++  return (void *)memchr(s, c, n);
+ }
+ 
+ }  // extern "C++"
+@@ -854,7 +854,7 @@
+     return NULL;
+   }
+ 
+-  return memchr(s, c, n);
++  return (void *)memchr(s, c, n);
+ }
+ 
+ #endif  // __cplusplus

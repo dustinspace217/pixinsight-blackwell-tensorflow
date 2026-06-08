@@ -1,0 +1,6 @@
+*.tar.gz
+*.orig
+.DS_Store
+*.swp
+build.log
+*.so

@@ -1,0 +1,25 @@
+--- tensorflow/core/kernels/gpu_prim.h.orig	2026-06-07 02:08:05.199399760 -0700
++++ tensorflow/core/kernels/gpu_prim.h	2026-06-07 02:08:05.203650898 -0700
+@@ -46,8 +46,8 @@
+ 
+ template <>
+ __device__ __forceinline__ Eigen::half ThreadLoadVolatilePointer<Eigen::half>(
+-    Eigen::half *ptr, Int2Type<true> /*is_primitive*/) {
+-  uint16_t result = *reinterpret_cast<volatile uint16_t *>(ptr);
++    const Eigen::half *ptr, Int2Type<true> /*is_primitive*/) {
++  uint16_t result = *reinterpret_cast<const volatile uint16_t *>(ptr);
+   return Eigen::numext::bit_cast<Eigen::half>(result);
+ }
+ 
+@@ -61,9 +61,9 @@
+ 
+ template <>
+ __device__ __forceinline__ Eigen::bfloat16
+-ThreadLoadVolatilePointer<Eigen::bfloat16>(Eigen::bfloat16 *ptr,
++ThreadLoadVolatilePointer<Eigen::bfloat16>(const Eigen::bfloat16 *ptr,
+                                            Int2Type<true> /*is_primitive*/) {
+-  uint16_t result = *reinterpret_cast<volatile uint16_t *>(ptr);
++  uint16_t result = *reinterpret_cast<const volatile uint16_t *>(ptr);
+   return Eigen::numext::bit_cast<Eigen::bfloat16>(result);
+ }
+ 
