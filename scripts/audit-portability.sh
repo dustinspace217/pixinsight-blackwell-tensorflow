@@ -22,11 +22,20 @@ if [ "$(printf '%s\n%s\n' "$worst" "$MAXG" | sort -V | tail -1)" != "$MAXG" ]; t
 fi
 echo "== libstdc++ (informational) =="
 objdump -T "$D"/lib/*.so* | grep -oE 'GLIBCXX_[0-9.]+|CXXABI_[0-9.]+' | sort -uV | tail -2
-echo "== GPU arches =="
-"$CUOBJ" --list-elf "$SO" | grep -oE 'sm_[0-9]+' | sort -u
-"$CUOBJ" --list-ptx "$SO" | grep -oE 'compute_[0-9]+' | sort -u
+# Run cuobjdump ONCE per listing into files, grep the files. Piping cuobjdump
+# straight into `grep -q` is a pipefail trap: grep exits at first match,
+# cuobjdump dies on SIGPIPE, and the pipeline "fails" despite a successful
+# match. Files also avoid 7 redundant scans of a ~1 GB shared object.
+"$CUOBJ" --list-elf "$SO" > "$D/elf.txt"
+"$CUOBJ" --list-ptx "$SO" > "$D/ptx.txt"
+echo "== GPU arches (SASS) =="
+grep -oE 'sm_[0-9]+' "$D/elf.txt" | sort -u
+echo "== embedded PTX modules =="
+# clang names embedded PTX by TARGET arch (foo.sm_120.ptx), unlike nvcc's
+# compute_XY labels — match either; informational grep guarded for pipefail.
+grep -oE 'compute_[0-9]+|sm_[0-9]+' "$D/ptx.txt" | sort -u || true
 for a in 80 86 89 90 120; do
-	"$CUOBJ" --list-elf "$SO" | grep -q "sm_$a" || { echo "FAIL: sm_$a SASS missing"; exit 1; }
+	grep -q "sm_$a" "$D/elf.txt" || { echo "FAIL: sm_$a SASS missing"; exit 1; }
 done
-"$CUOBJ" --list-ptx "$SO" | grep -q "compute_120" || { echo "FAIL: compute_120 PTX missing"; exit 1; }
-echo "PASS: glibc<=$MAXG, all 5 SASS arches + compute_120 PTX present"
+grep -qE "compute_120|sm_120" "$D/ptx.txt" || { echo "FAIL: cc-12.0 PTX missing (no forward-JIT path)"; exit 1; }
+echo "PASS: glibc<=$MAXG, all 5 SASS arches + cc-12.0 PTX present"
