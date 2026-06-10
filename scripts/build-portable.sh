@@ -34,6 +34,14 @@ if ! grep -q "const volatile uint16_t" "$WORK/tensorflow/tensorflow/core/kernels
 	patch --batch -d "$WORK/tensorflow" -p0 < "$REPO/patches/01-gpu_prim-cub-const.patch"
 fi
 
+# Patch 04 (GpuLaneId nvcc guard): under --config=cuda_nvcc, clang preprocesses
+# as nvcc's HOST compiler so __clang__ is defined, but cicc (nvcc's device
+# compiler) lacks clang's __nvvm_* builtins -> 'identifier undefined' in every
+# kernel including gpu_device_functions.h. Guard adds !defined(__NVCC__).
+if ! grep -q '!defined(__NVCC__)' "$WORK/tensorflow/tensorflow/core/util/gpu_device_functions.h"; then
+	patch --batch -d "$WORK/tensorflow" -p0 < "$REPO/patches/04-gpu-device-functions-nvcc-laneid.patch"
+fi
+
 # The container gets ONE mount: the work dir, relabeled :Z for SELinux.
 # Mounting the git repo itself was denied on Fedora (user_home_t label,
 # enforcing mode — AVC: bash denied read on container-build.sh), and we don't

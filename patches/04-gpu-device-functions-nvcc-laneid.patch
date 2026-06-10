@@ -1,0 +1,13 @@
+--- tensorflow/core/util/gpu_device_functions.h.orig
++++ tensorflow/core/util/gpu_device_functions.h
+@@ -194,8 +194,10 @@
+ __device__ inline unsigned GpuLaneId() {
+   unsigned int lane_id;
+ #if GOOGLE_CUDA
+-#if __clang__
++// nvcc with clang as host compiler defines __clang__ while its device-side
++// compiler (cicc) lacks clang's NVPTX builtins; route nvcc to inline PTX.
++#if defined(__clang__) && !defined(__NVCC__)
+   return __nvvm_read_ptx_sreg_laneid();
+ #else   // __clang__
+   asm("mov.u32 %0, %%laneid;" : "=r"(lane_id));
