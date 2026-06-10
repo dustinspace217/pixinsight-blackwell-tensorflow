@@ -10,16 +10,19 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-10-portable-artifacts-design.md` (decisions there are settled — do not re-ask).
 
-## Status (updated 2026-06-10 ~11:20)
-Phase: REBUILD running — lazy-CUDA variant (include_cuda_libs=false) per
-  Dustin's fallback directive; supersedes the hard-linked artifact that passed
-  gates 1-2 at ~05:45. Gates reworked for the new contract.
-Done: A+B complete; first fat build passed glibc/SASS/PTX + both load tests
-  (proves the recipe); audit now also gates NO-CUDA-in-DT_NEEDED; load test now
-  two-mode (BARE: CPU session + announced fallback; GPU-libs staged)
-Next: rebuild lands → gates 1-2 rerun → Task 12 on the NEW artifact (Dustin:
-  PixInsight GPU run) → repackage (true provenance) → READMEs → drafts → QA → publish
-Blocked: rebuild wall-clock; then Task 12 needs Dustin (sudo + GUI)
+## Status (updated 2026-06-10 ~14:15)
+Phase: C — lazy-CUDA artifact PASSED both gates; Task 12 (host GPU) is the
+  last gate before packaging/publish
+Done: lazy build BUILD_OK (NCCL stub fix 651c709); gate 1 PASS incl. new
+  no-CUDA-in-DT_NEEDED contract; gate 2 PASS all 4 combos (trixie+alma ×
+  bare+gpu-libs) — bare mode: SESSION_OK + DEVICE_COUNT 1 + captured
+  announcement "Could not find cuda drivers on your machine, GPU will not be
+  used." (the user-directed contract, now evidence-backed). NCCL no longer a
+  user-facing requirement (stub loads it only if collectives are ever used).
+Next: Task 12 (DUSTIN, on the NEW artifact) → repackage with true provenance →
+  READMEs (Task 15) → draft releases (Task 14) → memory (16) → QA workflow (17)
+  → publish (18)
+Blocked: Task 12 needs Dustin (sudo + GUI)
 
 ## Verified facts the plan builds on (do not re-derive)
 - TF 2.19 `.bazelrc:265` — `build:cuda_nvcc --config=cuda` + `TF_NVCC_CLANG=1` + `cuda_compiler=nvcc`. Host clang need NOT know sm_120; hermetic nvcc 12.8 does device SASS.
