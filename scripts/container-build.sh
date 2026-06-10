@@ -70,9 +70,16 @@ fi
 # when driver+CUDA+cuDNN are present, announced CPU fallback when not — the
 # user's directive 2026-06-10: "never break functionality, only improve it."
 # This matches Google's own distribution configuration (.bazelrc cuda_wheel).
+# TF_NCCL_USE_STUB=1: with include_cuda_libs=false, TF otherwise compiles
+# NCCL's DEVICE library from source (@nccl_archive//:device_lib), which needs
+# clang-offload-packager (absent from Alma 8's clang packaging). The stub —
+# TF's own RBE configuration (.bazelrc rbe_linux_cuda) — loads libnccl.so.2
+# dynamically IF anything ever calls NCCL, which single-GPU PixInsight use
+# never does. Verified in third_party/nccl/nccl_configure.bzl:13.
 bazel --output_user_root=/work/bazel-cache build -c opt \
 	--config=cuda_clang \
 	--@local_config_cuda//cuda:include_cuda_libs=false \
+	--repo_env=TF_NCCL_USE_STUB=1 \
 	--action_env=CLANG_CUDA_COMPILER_PATH=/usr/bin/clang \
 	--copt=-Wno-error --keep_going --jobs="$JOBS" \
 	--copt=-Qunused-arguments --host_copt=-Qunused-arguments \
