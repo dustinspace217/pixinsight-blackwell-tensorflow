@@ -27,6 +27,23 @@ export HOME=/work   # keeps every cache bazel makes on the bind mount
 
 cd /work/tensorflow
 
+# CUDA driver stub for build-time tool execution: TF's op-wrapper generators
+# (training_ops_gen_cc etc.) run DURING the build and link libcuda.so.1 — the
+# DRIVER library, which a GPU-less container doesn't have. NVIDIA ships a stub
+# in the toolkit for exactly this no-driver case; the hermetic cuda_cudart
+# package carries it. Symlink it as libcuda.so.1 inside the container (this is
+# the container's own /usr/lib64, discarded with it — never the host's).
+# On a FRESH cache the stub appears only after bazel's fetch phase — so this
+# also re-checks after a failed first attempt: re-running the script finds it.
+STUB="$(ls /work/bazel-cache/*/external/cuda_cudart/lib/stubs/libcuda.so 2>/dev/null | head -1 || true)"
+if [ -n "$STUB" ]; then
+	ln -sf "$STUB" /usr/lib64/libcuda.so.1
+	ldconfig
+	echo "driver stub linked: $STUB"
+else
+	echo "driver stub not in cache yet (fresh build) — genrules may fail once; re-run after fetch"
+fi
+
 # Flag provenance:
 #  --config=cuda_nvcc        verified .bazelrc:265 — implies --config=cuda,
 #                            nvcc for device, clang for host (TF_NVCC_CLANG=1)
