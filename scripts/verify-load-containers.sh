@@ -49,6 +49,18 @@ code = lib.TF_GetCode(ctypes.c_void_p(status))
 assert code == 0, f"TF_NewSession status code {code}"
 assert sess, "TF_NewSession returned NULL"
 print("SESSION_OK")
+
+# Session creation alone is lazier than expected — it does NOT probe CUDA
+# (verified 2026-06-10: bare-mode stderr stayed empty). Device ENUMERATION is
+# what forces the lazy dlopen and emits the missing-CUDA announcement, and
+# it's also what PixInsight tools effectively do when they ask for a GPU.
+lib.TF_SessionListDevices.restype = ctypes.c_void_p
+lib.TF_DeviceListCount.restype = ctypes.c_int
+devs = lib.TF_SessionListDevices(ctypes.c_void_p(sess), ctypes.c_void_p(status))
+assert lib.TF_GetCode(ctypes.c_void_p(status)) == 0, "TF_SessionListDevices failed"
+n = lib.TF_DeviceListCount(ctypes.c_void_p(devs))
+print("DEVICE_COUNT:", n)
+assert n >= 1, "no devices at all — CPU device missing"
 print("VERDICT: LOADS_OK")
 PYEOF
 
@@ -99,7 +111,7 @@ for IMG in docker.io/library/debian:trixie docker.io/library/almalinux:8; do
 		export LD_LIBRARY_PATH=/tf/lib
 		python3 /stage/tf_load_test.py 2> /tmp/bare_stderr.txt
 		echo "-- fallback announcement on stderr: --"
-		grep -iE "could not load|cuinit|skipping.*gpu|cuda" /tmp/bare_stderr.txt || echo "(no CUDA lines captured — check stderr below)"
+		grep -iE "could not load|cuinit|skipping.*gpu|cuda" /tmp/bare_stderr.txt || { echo "(no announcement captured — full stderr follows)"; cat /tmp/bare_stderr.txt; }
 
 		echo "-- GPU-LIBS mode (CUDA staged: must also load) --"
 		export LD_LIBRARY_PATH=/stage/cudalibs:/tf/lib
