@@ -8,6 +8,16 @@ StarNet on **NVIDIA Blackwell GPUs** (RTX 5070/5080/5090, compute capability
 **Status:** confirmed working — RTX 5080 + Fedora 44, all three RC Astro tools
 GPU-accelerated, no `CUDA_ERROR_INVALID_PTX`.
 
+**New (2026-06-10):** a **prebuilt portable build** is available under
+[Releases](../../releases) — one artifact for **Ampere through Blackwell**
+(sm_80→sm_120), runs on any x86_64 glibc ≥ 2.28 distro (Debian 10+,
+Ubuntu 20.04+, RHEL/Alma/Rocky 8+, Fedora, Arch, openSUSE), with **GPU
+acceleration when the CUDA stack is present and an announced CPU fallback when
+it isn't** — an incomplete GPU setup never breaks the tools, it only means
+slower runs and a clear notice in the launch log. See
+[Prebuilt portable build](#prebuilt-portable-build-recommended) below; the
+original Fedora host recipe follows for those who want to build themselves.
+
 ---
 
 ## Why this exists
@@ -29,10 +39,81 @@ So the only working option is to **build `libtensorflow` from source with CUDA
 the exact versions, the source patches a current toolchain needs, and the
 PixInsight install steps.
 
-> This repo contains **only** documentation, our scripts, and small **patches
-> (unified diffs)** against the upstream projects. It bundles no TensorFlow
-> source, no NVIDIA libraries, and no compiled binaries — you build those
-> yourself from the official sources. See [Licensing](#licensing).
+> The repo itself contains **only** documentation, our scripts, and small
+> **patches (unified diffs)** against the upstream projects — no TensorFlow
+> source and no NVIDIA libraries. Prebuilt `libtensorflow` binaries (built by
+> the container recipe below, Apache-2.0 with LICENSE + provenance included)
+> are published under [Releases](../../releases). See [Licensing](#licensing).
+
+---
+
+## Prebuilt portable build (recommended)
+
+Grab the latest `libtensorflow-2.19.0-gpu-cuda12.8-sm80_120-linux-x86_64.tar.xz`
+from [Releases](../../releases) and verify it:
+
+```bash
+sha256sum -c libtensorflow-2.19.0-gpu-cuda12.8-sm80_120-linux-x86_64.tar.xz.sha256
+```
+
+**What it is:** TensorFlow 2.19 `libtensorflow` C library with native GPU
+kernels for **sm_80, sm_86, sm_89, sm_90, sm_120** (RTX 30/40/50-series and
+A-series datacenter parts) plus cc-12.0 PTX for forward-JIT on future
+architectures.
+
+**Where it runs:** any x86_64 Linux with **glibc ≥ 2.28** — Debian 10+ (incl.
+Debian 13 "trixie"), Ubuntu 20.04+, RHEL/AlmaLinux/Rocky 8+, Fedora, Arch,
+openSUSE. (musl distros like Alpine are not supported — this is a glibc
+artifact.) Built inside a `manylinux_2_28` container; nothing newer than glibc
+2.28 is referenced (audited, and load-tested on Debian 13 and AlmaLinux 8).
+
+**Runtime behavior — GPU if possible, announced CPU fallback otherwise:**
+CUDA is loaded *lazily* at first use, never at load time. With the NVIDIA
+driver + CUDA 12.x runtime + cuDNN 9 on PixInsight's library path, tools run
+on the GPU. Without them, tools **still work on CPU**, and the launch log says
+why, e.g.:
+
+```
+Could not find cuda drivers on your machine, GPU will not be used.
+```
+
+(The notice goes to stderr — visible when PixInsight is launched from a
+terminal or via its launch log; the in-app Process Console may not show it.)
+NCCL is **not** required: it's stubbed and would only load for multi-GPU
+collective ops, which PixInsight tools never use.
+
+**GPU requirements** (only needed for GPU mode): NVIDIA driver (570+ for
+Blackwell), CUDA **12.x** runtime libraries, cuDNN **9** for CUDA 12 — on
+PixInsight's `LD_LIBRARY_PATH` (the [Install](#install-into-pixinsight) section
+and `scripts/pixinsight-gpu-fix.sh` handle this). On Debian/Ubuntu, install
+CUDA 12.x + cuDNN 9 via NVIDIA's official instructions for your release
+(apt packages typically land CUDA under `/usr/local/cuda-12.x` and cuDNN under
+`/usr/lib/x86_64-linux-gnu` — point the launcher at whichever directories hold
+`libcudart.so.12` and `libcudnn.so.9`).
+
+**Requirements: NVIDIA GPU (or CPU).** AMD/ROCm is out of scope: this artifact
+is CUDA machine code; a ROCm `libtensorflow` would be a separate untested
+build. (On a machine with no NVIDIA hardware at all the artifact still works —
+permanently in CPU mode.)
+
+### Reproduce it (container build)
+
+The portable artifact is built by [`scripts/build-portable.sh`](scripts/build-portable.sh)
+— a Podman/Docker recipe that clones TF v2.19.0, applies the source patches,
+and builds inside `quay.io/pypa/manylinux_2_28_x86_64` with `--config=cuda_clang`,
+`--@local_config_cuda//cuda:include_cuda_libs=false` (the lazy-loading
+contract) and `--repo_env=TF_NCCL_USE_STUB=1`. Expect one mid-build stop on the
+first attempt: the cutlass typo (patch 02) lives in a bazel-fetched external,
+so it's patched in the cache after the first failure, then the build resumes
+(no `bazel clean`). Verification gates:
+
+- [`scripts/audit-portability.sh`](scripts/audit-portability.sh) — glibc symbol
+  floor ≤ 2.28, **no CUDA sonames in `DT_NEEDED`** (lazy contract), all five
+  SASS arches + PTX present.
+- [`scripts/verify-load-containers.sh`](scripts/verify-load-containers.sh) —
+  loads the lib and creates a working TF session in Debian 13 and AlmaLinux 8
+  containers, both bare (CPU fallback + captured announcement) and with the
+  CUDA runtime staged.
 
 ---
 
@@ -152,10 +233,11 @@ Output: `bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz`.
    ```
    (Also remove any `libtensorflow*` bundled in `/opt/PixInsight/bin/lib` so the
    external build is used.)
-2. **Provide the two runtime libs the build links** that the CUDA runfile
-   toolkit doesn't put on the path — `libnccl.so.2` (from the build's hermetic
-   cache, or `dnf`) and `libcupti.so.12` (from `cuda-12.8/extras/CUPTI/lib64`) —
-   into `/usr/local/cuda-12.8/lib64`.
+2. **(Host-recipe builds only)** the original hard-linked host build also needs
+   `libnccl.so.2` (from the build's hermetic cache, or `dnf`) and
+   `libcupti.so.12` (from `cuda-12.8/extras/CUPTI/lib64`) copied into
+   `/usr/local/cuda-12.8/lib64`. The **prebuilt portable artifact does not** —
+   it loads CUDA lazily and never asks for NCCL.
 3. **Point PixInsight's launcher at the libraries.** PixInsight's launcher
    (`/opt/PixInsight/bin/PixInsight.sh`) hard-overwrites `LD_LIBRARY_PATH`;
    prepend the CUDA + TensorFlow dirs to its line 7. The idempotent
@@ -189,10 +271,12 @@ This repository is documentation, original scripts, and small patches:
   compiled binaries. You obtain TensorFlow from Google and CUDA/cuDNN/NCCL from
   NVIDIA under their respective licenses.
 
-A compiled `libtensorflow.so` you build is itself redistributable under
-Apache-2.0 (with TF's `LICENSE`/`NOTICE`) — but it is intentionally **not**
-distributed here, since it is pinned to one exact CUDA/glibc/`sm_120` toolchain
-and carries attribution obligations the recipe does not.
+A compiled `libtensorflow.so` is redistributable under Apache-2.0, and the
+**portable container build is distributed under [Releases](../../releases)** —
+each artifact ships TensorFlow's `LICENSE`/`THIRD_PARTY` notices plus a
+`PROVENANCE.txt` recording the exact build environment, flags, patches, and
+verification performed. The release binaries contain no NVIDIA code; CUDA,
+cuDNN, and the driver come from NVIDIA under their own licenses at runtime.
 
 ## Credits / prior art
 Built on the trail blazed by the PixInsight + Cloudy Nights community —
