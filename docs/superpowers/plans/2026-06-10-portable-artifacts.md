@@ -20,8 +20,12 @@ Done: lazy build BUILD_OK (NCCL stub fix 651c709); gate 1 PASS incl. new
   used." (the user-directed contract, now evidence-backed). NCCL no longer a
   user-facing requirement (stub loads it only if collectives are ever used).
 Next: Task 12 (DUSTIN, on the NEW artifact) → repackage with true provenance →
-  READMEs (Task 15) → draft releases (Task 14) → memory (16) → QA workflow (17)
-  → publish (18)
+  draft releases (Task 14) → memory (16) → QA workflow (17) → publish (18)
+Done additionally ~15:15: Task 15 READMEs (both repos: prebuilt/downloads,
+  distro tables, fallback contract, NVIDIA-only scope, patch-04 docs, pip-free
+  requirements) — committed AND PUSHED to GitHub (f64c9e9 / 9e16f3a; remotes
+  verified clean). NOTE: README Downloads links point at /releases pages that
+  stay empty until the drafts are published post-QA — known, intentional gap.
 Blocked: Task 12 needs Dustin (sudo + GUI)
 
 ## Verified facts the plan builds on (do not re-derive)
