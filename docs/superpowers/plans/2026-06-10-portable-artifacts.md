@@ -10,13 +10,15 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-10-portable-artifacts-design.md` (decisions there are settled — do not re-ask).
 
-## Status (updated 2026-06-10 ~03:00)
-Phase: A (build RUNNING ~24k/28.5k actions) + B COMPLETE + C scripts ready
-Done: Tasks 1-9 and 10-11 script-writing; trixie ORT verification PASSED
-  (CPU inference RUN_OK; provider glibc max 2.27); ORT bundle built (267 MB)
-Next: build completes → run audit-portability + verify-load-containers →
-  Task 12 (Dustin: host PI GPU run) → Phase D drafts/READMEs → Phase E QA → publish
-Blocked: TF container build wall-clock (~1.5-3 h remaining at kernel-compile rate)
+## Status (updated 2026-06-10 ~05:45)
+Phase: A+B COMPLETE; C gates 1-2 PASSED; artifact PACKAGED (190 MB tar.xz)
+Done: fat build SUCCEEDED under cuda_clang (BUILD_OK, 23,700 actions; boringssl
+  patch never needed under clang-21); gate 1 glibc=2.28 + 5 SASS arches +
+  cc-12.0 PTX; gate 2 LOADS_OK on trixie AND alma8 (20 CUDA libs staged by
+  soname); ORT side fully done (see ~03:00 entry)
+Next: Task 12 (DUSTIN: backup lib → install fat lib → PixInsight StarX/NXT run)
+  → Task 15 READMEs → Task 14 draft releases → Phase E QA workflow → publish
+Blocked: Task 12 needs Dustin (sudo + GUI)
 
 ## Verified facts the plan builds on (do not re-derive)
 - TF 2.19 `.bazelrc:265` — `build:cuda_nvcc --config=cuda` + `TF_NVCC_CLANG=1` + `cuda_compiler=nvcc`. Host clang need NOT know sm_120; hermetic nvcc 12.8 does device SASS.
@@ -638,3 +640,24 @@ fi
    stop/kill/launch invocations outright tonight — all container ops now route
    through script files. No effect on shipped artifacts.
 None of these change WHAT ships; all are how-it-runs fixes discovered by execution.
+
+**2026-06-10 ~05:45 (Tasks 4 iteration loop + 10-11 + 13):**
+8. *Behavioral-change (build config)*: cuda_nvcc → **cuda_clang** (61445b8) after TWO
+   nvcc-only error classes (GpuLaneId clang-builtin guard → patch 04, kept since it's
+   correct under both compilers; Eigen-half alignas(4)-vs-(2) in split/concat kernels).
+   The nvcc rationale (old container clang) was invalidated by Alma 8 shipping
+   clang-21 (sm_120-aware). Final config = the PROVEN Fedora host config.
+9. *New fix (container-only)*: CUDA driver stub symlinked in-container for build-time
+   op generators (3967f5d) — they DT_NEED libcuda.so.1; no driver in container.
+10. *Spec-assumption corrected*: clang names embedded PTX by target arch
+   (sm_120.ptx), not nvcc's compute_120 — audit gate updated (bf0c9d3). PTX IS present.
+11. *Script-bug class fixed twice*: pipefail+SIGPIPE — `cuobjdump|grep -q` and
+   `find|head -1` both die at first match (bf0c9d3, 6ceca51). Pattern: file-route
+   listings; find uses -print -quit.
+12. *Discovery (documentation-relevant)*: the hermetic GPU build hard-links its CUDA
+   deps (DT_NEEDED incl. libnccl.so.2 — NOT in the CUDA toolkit — and libcupti.so.12)
+   and libcuda.so.1: NO lazy-dlopen CPU fallback unlike Google's 2.18. Matches the
+   working host build's profile (host cuda dir already carries nccl+cupti). MUST be
+   in README requirements + is embedded in PROVENANCE.txt (5da396a).
+13. *Deferment* DEF-PORT-01 (LOW): boringssl memchr patch (03) unused under clang-21 —
+   keep in patches/ for clang-22+ host builds; note added to patches/README in Task 15.
