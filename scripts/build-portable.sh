@@ -27,8 +27,11 @@ fi
 
 # Patch 01 (gpu_prim cub-const) targets TF source, so it applies pre-build.
 # Idempotency guard: the patched line contains "const volatile uint16_t".
+# -p0 because the patch headers carry repo-root-relative paths with NO a/ b/
+# prefixes (generated as .orig-vs-modified diffs); --batch = never prompt,
+# fail loudly instead (set -e aborts the build).
 if ! grep -q "const volatile uint16_t" "$WORK/tensorflow/tensorflow/core/kernels/gpu_prim.h"; then
-	patch -d "$WORK/tensorflow" -p1 < "$REPO/patches/01-gpu_prim-cub-const.patch"
+	patch --batch -d "$WORK/tensorflow" -p0 < "$REPO/patches/01-gpu_prim-cub-const.patch"
 fi
 
 # Memory scope values are the PROVEN no-OOM set from the 2026-06-07 host build.
