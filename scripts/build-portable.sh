@@ -34,13 +34,19 @@ if ! grep -q "const volatile uint16_t" "$WORK/tensorflow/tensorflow/core/kernels
 	patch --batch -d "$WORK/tensorflow" -p0 < "$REPO/patches/01-gpu_prim-cub-const.patch"
 fi
 
+# The container gets ONE mount: the work dir, relabeled :Z for SELinux.
+# Mounting the git repo itself was denied on Fedora (user_home_t label,
+# enforcing mode — AVC: bash denied read on container-build.sh), and we don't
+# want podman relabeling a repo other tools use. So the single script the
+# container needs is COPIED into the work dir instead.
+cp "$REPO/scripts/container-build.sh" "$WORK/container-build.sh"
+
 # Memory scope values are the PROVEN no-OOM set from the 2026-06-07 host build.
 # TasksMax=400 (not the generic 200): bazel's JVM + workers legitimately exceed
 # 200 threads; MemoryMax stays the hard guard.
 exec systemd-run --user --scope --collect \
 	-p MemoryMax=32G -p MemoryHigh=28G -p MemorySwapMax=0 -p TasksMax=400 \
 	podman run --rm \
-		-v "$WORK:/work" \
-		-v "$REPO:/repo:ro" \
+		-v "$WORK:/work:Z" \
 		-e JOBS="${JOBS:-14}" \
-		"$IMG" bash /repo/scripts/container-build.sh
+		"$IMG" bash /work/container-build.sh
