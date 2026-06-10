@@ -45,8 +45,15 @@ else
 fi
 
 # Flag provenance:
-#  --config=cuda_nvcc        verified .bazelrc:265 — implies --config=cuda,
-#                            nvcc for device, clang for host (TF_NVCC_CLANG=1)
+#  --config=cuda_clang       SWITCHED from cuda_nvcc 2026-06-10 after TWO
+#                            nvcc-only error classes (GpuLaneId clang-builtin
+#                            guard; Eigen-half alignas(4)-vs-(2) strictness in
+#                            split/concat kernels). Alma 8's clang-21 knows
+#                            sm_120, so clang can compile device code directly —
+#                            this replicates the PROVEN Fedora host config
+#                            (cuda_clang + clang-22) one compiler version off.
+#  CLANG_CUDA_COMPILER_PATH  how cuda_clang finds the device compiler
+#                            (verified .bazelrc:260, cuda_clang_official)
 #  --repo_env on the CLI     proven gotcha: rc-layered defaults (CUDA 12.5.1 /
 #                            cuDNN 9.3.0) silently win otherwise
 #  arch list                 spec decision: fat binary; syntax verified
@@ -58,7 +65,8 @@ fi
 #                            plain C; clang-21 hard-errors on the unused arg.
 #                            Same fix cuda_clang itself uses (.bazelrc:239).
 bazel --output_user_root=/work/bazel-cache build -c opt \
-	--config=cuda_nvcc \
+	--config=cuda_clang \
+	--action_env=CLANG_CUDA_COMPILER_PATH=/usr/bin/clang \
 	--copt=-Wno-error --keep_going --jobs="$JOBS" \
 	--copt=-Qunused-arguments --host_copt=-Qunused-arguments \
 	--repo_env=HERMETIC_PYTHON_VERSION=3.12 \
