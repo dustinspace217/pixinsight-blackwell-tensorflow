@@ -10,11 +10,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-10-portable-artifacts-design.md` (decisions there are settled — do not re-ask).
 
-## Status (updated 2026-06-10)
-Phase: plan written, execution not started
-Done: spec approved; bazelrc facts verified (cuda_nvcc exists; arch syntax `sm_XX,compute_XY`; lld required)
-Next: Task 1 (pre-flight checks) → Task 4 kickoff (long build) → DeepSNR tasks in parallel
-Blocked: nothing
+## Status (updated 2026-06-10 ~03:00)
+Phase: A (build RUNNING ~24k/28.5k actions) + B COMPLETE + C scripts ready
+Done: Tasks 1-9 and 10-11 script-writing; trixie ORT verification PASSED
+  (CPU inference RUN_OK; provider glibc max 2.27); ORT bundle built (267 MB)
+Next: build completes → run audit-portability + verify-load-containers →
+  Task 12 (Dustin: host PI GPU run) → Phase D drafts/READMEs → Phase E QA → publish
+Blocked: TF container build wall-clock (~1.5-3 h remaining at kernel-compile rate)
 
 ## Verified facts the plan builds on (do not re-derive)
 - TF 2.19 `.bazelrc:265` — `build:cuda_nvcc --config=cuda` + `TF_NVCC_CLANG=1` + `cuda_compiler=nvcc`. Host clang need NOT know sm_120; hermetic nvcc 12.8 does device SASS.
@@ -614,3 +616,25 @@ fi
 
 ## Deviations log
 (append at each commit boundary)
+
+**2026-06-10 ~03:00 (Tasks 1-11):**
+1. *Behavioral-fix*: gpu_prim patch applies with `-p0` not `-p1` (bare repo-relative
+   header paths) + `--batch` (2c8da29). Plan-as-written had -p1; failed on first run.
+2. *Behavioral-fix*: SELinux (enforcing, Fedora) denied the repo bind-mount — Dustin
+   diagnosed it from the AVC alert. Reworked to single `:Z`-labeled work-dir mount,
+   script copied in (5a01a85). Same stage-dir pattern then applied proactively to
+   BOTH container verify scripts (never relabel /opt/PixInsight or the git repos).
+3. *Behavioral-fix*: host clang-21 (Alma 8 ships 21, newer than assumed) hard-errors
+   on unused `--cuda-path` → added `-Qunused-arguments`, the same fix cuda_clang
+   itself carries (9d2e2e8).
+4. *Behavioral-fix*: fetch_ort_wheel.py excludes free-threaded (cp3XXt) wheels —
+   deterministic sort had picked cp314t, which the trixie pip can't install (1574949).
+5. *Behavioral-fix*: trixie verify keeps original wheel filename (PEP 427 parsing)
+   and pip-resolves the container-matching build for the inference half; ABI audit
+   stays on the exact shipped wheel (1574949).
+6. *Behavioral-fix*: ORT bundle takes LICENSE from `onnxruntime/LICENSE` (wheel has
+   no dist-info license file) (2f0132c).
+7. *Tooling note*: Claude Code H.replace renderer bug killed several podman
+   stop/kill/launch invocations outright tonight — all container ops now route
+   through script files. No effect on shipped artifacts.
+None of these change WHAT ships; all are how-it-runs fixes discovered by execution.
