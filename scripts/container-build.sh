@@ -64,8 +64,15 @@ fi
 #  -Qunused-arguments        crosstool passes --cuda-path to host clang even for
 #                            plain C; clang-21 hard-errors on the unused arg.
 #                            Same fix cuda_clang itself uses (.bazelrc:239).
+# include_cuda_libs=false (overrides --config=cuda's =true; later flag wins):
+# do NOT hard-link the CUDA libraries. TF then loads them lazily by soname at
+# first GPU use (dso_loader), so the SAME artifact runs everywhere: full GPU
+# when driver+CUDA+cuDNN are present, announced CPU fallback when not — the
+# user's directive 2026-06-10: "never break functionality, only improve it."
+# This matches Google's own distribution configuration (.bazelrc cuda_wheel).
 bazel --output_user_root=/work/bazel-cache build -c opt \
 	--config=cuda_clang \
+	--@local_config_cuda//cuda:include_cuda_libs=false \
 	--action_env=CLANG_CUDA_COMPILER_PATH=/usr/bin/clang \
 	--copt=-Wno-error --keep_going --jobs="$JOBS" \
 	--copt=-Qunused-arguments --host_copt=-Qunused-arguments \
