@@ -37,9 +37,13 @@ cd /work/tensorflow
 #  cstdint force-include +   proven fixes #2/#3 from the Fedora build; harmless
 #  warning suppressions      if this clang doesn't need them
 #  -Wno-error                survive new-compiler warnings (proven)
+#  -Qunused-arguments        crosstool passes --cuda-path to host clang even for
+#                            plain C; clang-21 hard-errors on the unused arg.
+#                            Same fix cuda_clang itself uses (.bazelrc:239).
 bazel --output_user_root=/work/bazel-cache build -c opt \
 	--config=cuda_nvcc \
 	--copt=-Wno-error --keep_going --jobs="$JOBS" \
+	--copt=-Qunused-arguments --host_copt=-Qunused-arguments \
 	--repo_env=HERMETIC_PYTHON_VERSION=3.12 \
 	--repo_env=HERMETIC_CUDA_VERSION=12.8.0 \
 	--repo_env=HERMETIC_CUDNN_VERSION=9.7.0 \
