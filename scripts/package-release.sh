@@ -2,8 +2,8 @@
 # package-release.sh — turns the raw bazel lib_package tarball into the named
 # release artifact: recompress as xz (smaller; gz→xz typically 25-35% off),
 # verify LICENSE presence (Apache-2.0 requires it), embed build provenance
-# including the load-time dependency contract (this build hard-links its CUDA
-# deps — no lazy-dlopen CPU fallback like Google's 2.18 build).
+# including the runtime contract (lazy CUDA loading: GPU when the stack is
+# present, announced CPU fallback when not — user directive 2026-06-10).
 #   usage: bash scripts/package-release.sh <libtensorflow.tar.gz> <out-dir>
 set -euo pipefail
 TAR="${1:?usage: package-release.sh <tarball> <outdir>}"
@@ -20,18 +20,23 @@ ls "$D/$NAME"/LICENSE* >/dev/null || { echo "FAIL: no LICENSE in lib_package out
 	echo "Source: tensorflow v2.19.0 (github.com/tensorflow/tensorflow) + patches/ in"
 	echo "  github.com/dustinspace217/pixinsight-blackwell-tensorflow"
 	echo "Build env: quay.io/pypa/manylinux_2_28_x86_64 container (glibc 2.28 floor),"
-	echo "  --config=cuda_clang with AlmaLinux 8 clang-21, lld"
+	echo "  --config=cuda_clang with AlmaLinux 8 clang-21, lld,"
+	echo "  --@local_config_cuda//cuda:include_cuda_libs=false (lazy CUDA loading)"
 	echo "Hermetic: CUDA 12.8.0, cuDNN 9.7.0, python 3.12"
 	echo "GPU arches: SASS sm_80,sm_86,sm_89,sm_90,sm_120 + cc-12.0 PTX (forward-JIT)"
 	echo ""
-	echo "Load-time requirements (DT_NEEDED — NO CPU fallback if missing):"
-	echo "  NVIDIA driver (libcuda.so.1), CUDA 12.x runtime (cudart, cublas/Lt,"
-	echo "  cufft, cusolver, cusparse, nvrtc + builtins 12.8, nvJitLink, cupti),"
-	echo "  cuDNN 9 family, NCCL 2 (libnccl.so.2 — NOT part of the CUDA toolkit)."
-	echo "  All must be on the loader path (see README: PixInsight.sh edit)."
+	echo "Runtime contract: CUDA is loaded LAZILY at first use. With the NVIDIA"
+	echo "  driver + CUDA 12.x runtime (cudart, cublas/Lt, cufft, cusolver,"
+	echo "  cusparse, nvrtc + builtins 12.8, nvJitLink, cupti) + cuDNN 9 + NCCL 2"
+	echo "  (libnccl.so.2 — NOT part of the CUDA toolkit) on the loader path,"
+	echo "  tools run on the GPU. Without them, tools still run on CPU and the"
+	echo "  missing-library notice appears on stderr (launch log). Functionality"
+	echo "  is never broken by an incomplete GPU stack — only slower."
 	echo ""
-	echo "Verified: glibc symbol audit <=2.28; loads on Debian 13 (trixie) and"
-	echo "  AlmaLinux 8 containers; GPU end-to-end in PixInsight on RTX 5080/Fedora 44."
+	echo "Verified: glibc symbol audit <=2.28; no CUDA sonames in DT_NEEDED;"
+	echo "  bare-container CPU session + announced fallback AND staged-GPU-libs"
+	echo "  load on Debian 13 + AlmaLinux 8; GPU end-to-end in PixInsight on"
+	echo "  RTX 5080 / Fedora 44 (this exact artifact)."
 } > "$D/$NAME/PROVENANCE.txt"
 
 mkdir -p "$OUT"

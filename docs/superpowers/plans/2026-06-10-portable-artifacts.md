@@ -10,15 +10,16 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-10-portable-artifacts-design.md` (decisions there are settled — do not re-ask).
 
-## Status (updated 2026-06-10 ~05:45)
-Phase: A+B COMPLETE; C gates 1-2 PASSED; artifact PACKAGED (190 MB tar.xz)
-Done: fat build SUCCEEDED under cuda_clang (BUILD_OK, 23,700 actions; boringssl
-  patch never needed under clang-21); gate 1 glibc=2.28 + 5 SASS arches +
-  cc-12.0 PTX; gate 2 LOADS_OK on trixie AND alma8 (20 CUDA libs staged by
-  soname); ORT side fully done (see ~03:00 entry)
-Next: Task 12 (DUSTIN: backup lib → install fat lib → PixInsight StarX/NXT run)
-  → Task 15 READMEs → Task 14 draft releases → Phase E QA workflow → publish
-Blocked: Task 12 needs Dustin (sudo + GUI)
+## Status (updated 2026-06-10 ~11:20)
+Phase: REBUILD running — lazy-CUDA variant (include_cuda_libs=false) per
+  Dustin's fallback directive; supersedes the hard-linked artifact that passed
+  gates 1-2 at ~05:45. Gates reworked for the new contract.
+Done: A+B complete; first fat build passed glibc/SASS/PTX + both load tests
+  (proves the recipe); audit now also gates NO-CUDA-in-DT_NEEDED; load test now
+  two-mode (BARE: CPU session + announced fallback; GPU-libs staged)
+Next: rebuild lands → gates 1-2 rerun → Task 12 on the NEW artifact (Dustin:
+  PixInsight GPU run) → repackage (true provenance) → READMEs → drafts → QA → publish
+Blocked: rebuild wall-clock; then Task 12 needs Dustin (sudo + GUI)
 
 ## Verified facts the plan builds on (do not re-derive)
 - TF 2.19 `.bazelrc:265` — `build:cuda_nvcc --config=cuda` + `TF_NVCC_CLANG=1` + `cuda_compiler=nvcc`. Host clang need NOT know sm_120; hermetic nvcc 12.8 does device SASS.
@@ -661,3 +662,12 @@ None of these change WHAT ships; all are how-it-runs fixes discovered by executi
    in README requirements + is embedded in PROVENANCE.txt (5da396a).
 13. *Deferment* DEF-PORT-01 (LOW): boringssl memchr patch (03) unused under clang-21 —
    keep in patches/ for clang-22+ host builds; note added to patches/README in Task 15.
+
+**2026-06-10 ~11:20 (user-directed behavior change):**
+14. *Behavioral-change (USER DECISION, not drift)*: artifact rebuilt with
+   `include_cuda_libs=false` → lazy CUDA loading, GPU-if-present + ANNOUNCED CPU
+   fallback (12779e1). Dustin's directive after the no-fallback explanation:
+   "never break functionality, only improve upon it." The hard-linked artifact that
+   passed gates at ~05:45 is superseded (kept at ~/tf-portable-build/out until the
+   new one passes — do not delete before then). Gates inverted/extended accordingly;
+   Task 12 deliberately NOT run on the superseded artifact.

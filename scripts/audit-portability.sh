@@ -22,6 +22,17 @@ if [ "$(printf '%s\n%s\n' "$worst" "$MAXG" | sort -V | tail -1)" != "$MAXG" ]; t
 fi
 echo "== libstdc++ (informational) =="
 objdump -T "$D"/lib/*.so* | grep -oE 'GLIBCXX_[0-9.]+|CXXABI_[0-9.]+' | sort -uV | tail -2
+echo "== load-time dependency contract =="
+# The artifact is built with include_cuda_libs=false: CUDA must be loaded
+# LAZILY (dlopen at first GPU use → announced CPU fallback), never via
+# DT_NEEDED — a hard-linked CUDA soname here would reintroduce the
+# fails-to-load-without-GPU behavior the 2026-06-10 user directive rejected.
+objdump -p "$D"/lib/*.so* | grep NEEDED > "$D/needed.txt" || true
+if grep -E "libcu|libnv|libnccl" "$D/needed.txt"; then
+	echo "FAIL: CUDA/NVIDIA soname in DT_NEEDED — lazy-loading contract broken"
+	exit 1
+fi
+echo "PASS: no CUDA sonames in DT_NEEDED (lazy dlopen contract)"
 # Run cuobjdump ONCE per listing into files, grep the files. Piping cuobjdump
 # straight into `grep -q` is a pipefail trap: grep exits at first match,
 # cuobjdump dies on SIGPIPE, and the pipeline "fails" despite a successful

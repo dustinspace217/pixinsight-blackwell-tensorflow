@@ -32,6 +32,18 @@ Blocked: nothing
     choice is compiled into StarNet's binary. Vendor-level limitation.
   - README scope line: "Requirements: NVIDIA GPU." One-sentence AMD pointer.
 - **musl distros (Alpine) excluded** — glibc artifacts; note in README, no work.
+- **Lazy CUDA loading with ANNOUNCED CPU fallback** (Dustin, 2026-06-10 ~11:00,
+  superseding the first fat build's hard-linked contract): "What would be ideal
+  is GPU acceleration if possible, fallback to CPU acceleration that gets
+  announced in the pixinsight console and log. That way, we never break
+  functionality, only improve upon it." Implemented via
+  `--@local_config_cuda//cuda:include_cuda_libs=false` (the same configuration
+  Google's distribution builds use — verified .bazelrc:231/234 + hermetic
+  BUILD.tpl). Gates updated: DT_NEEDED must contain NO CUDA sonames; container
+  load tests run BARE (CPU session + stderr announcement captured) and
+  GPU-libs-staged modes. Caveat documented in README: the announcement lands on
+  stderr/launch log; PixInsight's in-app console may not mirror it — the
+  diagnose script + README cover discovery.
 
 ## Artifact 1 — portable fat libtensorflow (this repo)
 
