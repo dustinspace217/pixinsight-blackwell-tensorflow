@@ -259,6 +259,16 @@ onto the CPU if the GPU library ever breaks.
 
 ---
 
+## Using DeepSNR? (it's ONNX, not TensorFlow)
+
+DeepSNR moved off TensorFlow to **ONNX Runtime**, so this `libtensorflow` won't
+accelerate it. Use the companion project:
+**[deepsnr-gpu-linux](https://github.com/dustinspace217/deepsnr-gpu-linux)**.
+RC Astro's tools are also moving to ONNX+CUDA on Linux in a future version (per
+the developer) — that release will cover them once it ships.
+
+---
+
 ## Licensing
 
 This repository is documentation, original scripts, and small patches:
