@@ -35,8 +35,10 @@ ls "$D/$NAME"/LICENSE* >/dev/null || { echo "FAIL: no LICENSE in lib_package out
 	echo ""
 	echo "Verified: glibc symbol audit <=2.28; no CUDA sonames in DT_NEEDED;"
 	echo "  bare-container CPU session + announced fallback AND staged-GPU-libs"
-	echo "  load on Debian 13 + AlmaLinux 8; GPU end-to-end in PixInsight on"
-	echo "  RTX 5080 / Fedora 44 (this exact artifact)."
+	echo "  load on Debian 13 + AlmaLinux 8. GPU acceleration in PixInsight was"
+	echo "  confirmed on the sm_120-only predecessor build (RTX 5080 / Fedora 44,"
+	echo "  2026-06-09); a host GPU run on THIS exact multi-arch artifact is"
+	echo "  pending -- reports welcome."
 } > "$D/$NAME/PROVENANCE.txt"
 
 mkdir -p "$OUT"
